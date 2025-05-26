@@ -1,25 +1,126 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Activity Monitoring Data Analysis"
+author: "Caesar Asiba"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
 ---
 
+```{r} 
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+```
 
-## Loading and preprocessing the data
+##1. Loading and Preprocessing the Data
+```{r}
+# Read the CSV file included in the repository
+activity <- read.csv("activity.csv", stringsAsFactors = FALSE)
+#Convert date column to Date type
+activity$date <- as.Date(activity$date)
+# Inspect structure
+str(activity)
+summary(activity)
+```
+
+##2. Mean number of steps taken per day
+```{r}
+# i. Number of steps
+daily_steps <- activity %>%
+        filter(!is.na(steps)) %>%
+        group_by(date) %>%
+        summarise(total_steps = sum(steps))
+# ii. Histogram of no. of steps/ day
+ggplot(daily_steps, aes(x = total_steps)) +
+        geom_histogram(binwidth = 1000, boundary = 0) +
+        labs(x = "Total Steps per Day", y = "Frequency",
+             title = "Histogram of Total Steps per Day")
+
+# iii. Mean & median of total no. of steps/day
+mean_steps <- mean(daily_steps$total_steps)
+median_steps <- median(daily_steps$total_steps)
+mean_steps; median_steps
+
+```
+
+##3.Average daily activity pattern
+```{r} 
+# Compute mean steps per interval across all days
+interval_pattern <- activity %>%
+        filter(!is.na(steps)) %>%
+        group_by(interval) %>%
+        summarise(avg_steps = mean(steps))
+
+# Time series plot
+ggplot(interval_pattern, aes(x = interval, y = avg_steps)) +
+        geom_line() +
+        labs(x = "5-minute Interval", y = "Average Number of Steps",
+             title = "Average Daily Activity Pattern")
+
+#Identify interval with max average steps
+max_interval <- interval_pattern %>%
+        filter(avg_steps == max(avg_steps)) %>%
+        pull(interval)
+max_interval
+```
+
+##4. Imputing missing values
+
+```{r}
+#Total number of missing values in steps
+total_missing <- sum(is.na(activity$steps))
+total_missing
+```
+Strategy for imputing missing values: Replace each missing steps with the mean for that 5-minute interval.
+```{r}
+# Create function to impute
+activity_imputed <- activity %>%
+        group_by(interval) %>%
+        mutate(steps = ifelse(is.na(steps), round(mean(steps, na.rm = TRUE)), steps)) %>%
+        ungroup()
+
+# Verify no NAs remain
+sum(is.na(activity_imputed$steps))
+
+# Recalculate total steps per day with imputed data
+daily_imputed <- activity_imputed %>%
+        group_by(date) %>%
+        summarise(total_steps = sum(steps))
+
+# Histogram
+ggplot(daily_imputed, aes(x = total_steps)) +
+        geom_histogram(binwidth = 1000, boundary = 0) +
+        labs(x = "Total Steps per Day", y = "Frequency",
+             title = "Histogram of Total Steps per Day (Imputed Data)")
+
+# Mean and median with imputed data
+mean_imputed <- mean(daily_imputed$total_steps)
+median_imputed <- median(daily_imputed$total_steps)
+mean_imputed; median_imputed
+```
+
+Differences in activity patterns between weekdays and weekends
+```{r}
+# Add weekday/weekend factor
+activity_imputed <- activity_imputed %>%
+        mutate(
+                weekday = weekdays(date),
+                day_type = ifelse(weekday %in% c("Saturday", "Sunday"), "weekend", "weekday")
+        )
+
+# Compute average by interval and day_type
+pattern_daytype <- activity_imputed %>%
+        group_by(day_type, interval) %>%
+        summarise(avg_steps = mean(steps)) %>%
+        ungroup()
+
+# Panel plot
+ggplot(pattern_daytype, aes(x = interval, y = avg_steps)) +
+        geom_line() +
+        facet_wrap(~ day_type, ncol = 1) +
+        labs(x = "5-minute Interval", y = "Average Number of Steps",
+             title = "Average Steps by Interval: Weekday vs. Weekend")
+```
 
 
-
-## What is mean total number of steps taken per day?
-
-
-
-## What is the average daily activity pattern?
-
-
-
-## Imputing missing values
-
-
-
-## Are there differences in activity patterns between weekdays and weekends?
